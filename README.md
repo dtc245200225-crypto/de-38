@@ -1,5 +1,8 @@
 # Đề tài 38: Hệ thống Quản lý Chi tiêu
 
+- **Địa chỉ IP Server:** `192.168.105.128`
+- **Môn học:** Triển khai và Quản trị Hệ thống Phần mềm
+
 Ứng dụng theo dõi chi tiêu cá nhân/gia đình, triển khai bằng Docker Compose. Stack gồm frontend Nginx, API Node.js/Express, PostgreSQL, pgAdmin, Prometheus, cAdvisor, Grafana, Loki và Promtail.
 
 ## Yêu cầu
