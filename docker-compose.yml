@@ -1,0 +1,146 @@
+version: '3.8'
+
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+    internal: true
+  monitoring_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  grafana_data:
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: expense_user
+      POSTGRES_PASSWORD: SecurePass123!@#ExP
+      POSTGRES_DB: expense_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend_net
+    user: postgres
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@domain.com
+      PGADMIN_DEFAULT_PASSWORD: StrongPgAdminPass123!
+    ports:
+      - "5050:80"
+    networks:
+      - frontend_net
+      - backend_net
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://expense_user:SecurePass123!%40%23ExP@postgres:5432/expense_db?sslmode=disable"
+    networks:
+      - backend_net
+      - monitoring_net
+
+  backend:
+    build: ./backend
+    container_name: backend_app
+    restart: always
+    environment:
+      PORT: 5000
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: expense_user
+      POSTGRES_PASSWORD: SecurePass123!@#ExP
+      POSTGRES_DB: expense_db
+    networks:
+      - backend_net
+      - monitoring_net
+
+  frontend:
+    build: ./frontend
+    container_name: frontend_app
+    restart: always
+    networks:
+      - frontend_net
+
+  nginx:
+    build: ./nginx
+    container_name: nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /var/log/nginx:/var/log/nginx
+    networks:
+      - frontend_net
+      - monitoring_net
+    depends_on:
+      - frontend
+      - backend
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring_net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: cadvisor
+    restart: always
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitoring_net
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitoring_net
+
+  loki:
+    image: grafana/loki:2.8.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring_net
+
+  promtail:
+    image: grafana/promtail:2.8.2
+    container_name: promtail
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/log/nginx:/var/log/nginx:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring_net
