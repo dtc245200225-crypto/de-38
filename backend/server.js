@@ -29,7 +29,7 @@ app.use((req, res, next) => {
 
 const pool = new Pool({
   host: process.env.POSTGRES_HOST || 'postgres',
-  user: process.env.POSTGRES_USER || 'expense_user',
+  user: process.env.POSTGRES_USER || 'admin',
   password: process.env.POSTGRES_PASSWORD,
   database: process.env.POSTGRES_DB || 'expense_db',
   port: Number(process.env.POSTGRES_PORT || 5432),

@@ -16,7 +16,7 @@ cd de-38
 cp .env.example .env
 ```
 
-Sửa bốn giá trị trong `.env` thành các mật khẩu dài, riêng biệt và không dùng lại mật khẩu cá nhân. Tệp `.env` đã được loại khỏi Git. Sau đó chạy:
+Tài khoản demo theo yêu cầu của đề tài là `admin` với mật khẩu `123456`. Mẫu `.env.example` đã đặt sẵn các giá trị này; có thể giữ nguyên `.env` để chạy demo. Đây là mật khẩu yếu, chỉ dùng cho môi trường học tập cô lập và không dùng lại trên dịch vụ công khai hoặc tài khoản cá nhân. Tệp `.env` đã được loại khỏi Git. Sau đó chạy:
 
 ```sh
 docker compose config
@@ -41,40 +41,76 @@ Chờ các dịch vụ khởi động, sau đó mở website ở cổng 80. Cấ
 
 PostgreSQL chỉ tham gia mạng `backend_net` nội bộ. Không công khai cổng database. PostgreSQL exporter dùng tài khoản riêng `postgres_exporter` có quyền `pg_monitor`, được tạo trong lần khởi tạo volume mới. Promtail chỉ đọc thư mục log Nginx và không cần quyền truy cập Docker socket.
 
-## Truy cập và đăng nhập
+## Đường dẫn truy cập và tài khoản
 
-- Website: `http://<server-ip>/`
-- pgAdmin: `http://<server-ip>:5050/` — email `admin@domain.com`, mật khẩu lấy từ `PGADMIN_DEFAULT_PASSWORD` trong `.env`
-- Prometheus: `http://<server-ip>:9090/`
-- Grafana: `http://<server-ip>:3000/` — tài khoản `admin`, mật khẩu lấy từ `GRAFANA_ADMIN_PASSWORD` trong `.env`
-- Loki API: `http://<server-ip>:3100/` (chỉ mở cổng này trong mạng demo cần thiết)
+Địa chỉ demo hiện dùng là `192.168.105.128`. Mở các đường dẫn sau trên máy cùng mạng; nếu chạy trên máy khác, thay địa chỉ IP này bằng IP máy chủ Docker.
 
-Không đưa `.env` hoặc mật khẩu thật vào commit. Nếu các mật khẩu cũ đã từng được commit hoặc dùng trên máy chủ, hãy thay chúng và cập nhật đồng thời thông tin xác thực trong môi trường triển khai.
+| Trang/chức năng | Đường dẫn trực tiếp | Tài khoản |
+|---|---|---|
+| Website Expense Tracker | http://192.168.105.128/ | Không có màn hình đăng nhập |
+| API danh sách khoản chi | http://192.168.105.128/api/expenses | Không cần đăng nhập |
+| Kiểm tra API | http://192.168.105.128/healthz | Không cần đăng nhập |
+| pgAdmin | http://192.168.105.128:5050/ | `admin@domain.com` / `123456` |
+| Prometheus | http://192.168.105.128:9090/ | Không cần đăng nhập |
+| Prometheus targets | http://192.168.105.128:9090/targets | Không cần đăng nhập |
+| Grafana | http://192.168.105.128:3000/ | `admin` / `123456` |
+| Dashboard Expense Tracker | http://192.168.105.128:3000/d/expense-tracker/expense-tracker | Đăng nhập Grafana bằng `admin` / `123456` |
+| Loki readiness | http://192.168.105.128:3100/ready | Endpoint kiểm tra; truy vấn log trong Grafana Explore |
+
+Tài khoản PostgreSQL để kết nối từ pgAdmin là `admin` / `123456`, database `expense_db`, hostname `postgres`, cổng `5432` (chỉ truy cập được từ mạng Docker). pgAdmin yêu cầu địa chỉ email cho tài khoản quản trị nên tên đăng nhập giao diện của pgAdmin là `admin@domain.com`; mật khẩu vẫn là `123456`. Prometheus, Loki, API và website demo hiện không có đăng nhập. cAdvisor không mở cổng ra máy chủ; xem metrics qua Prometheus/Grafana.
+
+Các dịch vụ Grafana và pgAdmin khởi tạo mật khẩu từ biến môi trường lúc khởi tạo ban đầu. Grafana có volume lưu dữ liệu; nếu volume Grafana đã tồn tại với mật khẩu cũ, đổi `GF_SECURITY_ADMIN_PASSWORD` trong Compose chưa đủ. Đặt lại bằng lệnh sau rồi đăng nhập bằng `admin` / `123456`:
+
+```sh
+docker compose exec grafana grafana-cli admin reset-admin-password 123456
+```
+
+Mật khẩu `123456` được yêu cầu cho bản demo và không đạt tiêu chí mật khẩu mạnh trong yêu cầu hardening. Không đưa stack này ra Internet với mật khẩu đó; giới hạn các cổng demo bằng firewall.
 
 ### Cập nhật volume PostgreSQL đã tồn tại
 
-Script tạo `postgres_exporter` chỉ chạy khi volume `pgdata` được khởi tạo lần đầu. Với volume cũ, sau khi cập nhật `.env`, đăng nhập PostgreSQL bằng tài khoản quản trị và chạy một lần:
+`POSTGRES_USER` và `POSTGRES_PASSWORD` chỉ được áp dụng khi volume `pgdata` được khởi tạo lần đầu. Với volume cũ từ cấu hình `expense_user`, backend cần tài khoản `admin` mới. Dừng backend rồi mở psql bằng role quản trị cũ (mặc định trước đây là `expense_user`):
+
+```sh
+docker compose stop backend
+docker compose exec postgres psql -U expense_user -d postgres
+```
+
+Tại dấu nhắc psql, chạy các câu lệnh sau một lần:
 
 ```sql
-CREATE ROLE postgres_exporter LOGIN PASSWORD 'thay-bang-POSTGRES_EXPORTER_PASSWORD';
+CREATE ROLE admin LOGIN PASSWORD '123456';
+GRANT CONNECT ON DATABASE expense_db TO admin;
+\c expense_db
+GRANT USAGE, CREATE ON SCHEMA public TO admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO admin;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO admin;
+CREATE ROLE postgres_exporter LOGIN PASSWORD '123456';
 GRANT CONNECT ON DATABASE expense_db TO postgres_exporter;
 GRANT pg_monitor TO postgres_exporter;
 ```
 
-Sau đó khởi động lại exporter: `docker compose up -d postgres-exporter prometheus`.
+Sau đó thoát psql bằng `\q` và cập nhật toàn bộ stack cùng mật khẩu Grafana:
+
+```sh
+docker compose up -d --build
+docker compose exec grafana grafana-cli admin reset-admin-password 123456
+```
+
+Nếu role `admin` hoặc `postgres_exporter` đã tồn tại, dùng `ALTER ROLE <ten_role> WITH PASSWORD '123456';` thay cho câu lệnh `CREATE ROLE` tương ứng.
 
 ## Dữ liệu mẫu, lưu trữ và sao lưu
 
 Tệp `postgres/seed/demo-expenses.sql` chứa hai khoản chi **minh họa** để trình diễn giao diện. Nạp dữ liệu sau khi ứng dụng đã khởi tạo bảng `expenses`:
 
 ```sh
-docker compose exec -T postgres psql -U expense_user -d expense_db < postgres/seed/demo-expenses.sql
+docker compose exec -T postgres psql -U admin -d expense_db < postgres/seed/demo-expenses.sql
 ```
 
 Trên PowerShell, có thể nạp tệp bằng pipeline:
 
 ```powershell
-Get-Content -Raw .\postgres\seed\demo-expenses.sql | docker compose exec -T postgres psql -U expense_user -d expense_db
+Get-Content -Raw .\postgres\seed\demo-expenses.sql | docker compose exec -T postgres psql -U admin -d expense_db
 ```
 
 Dữ liệu vận hành được lưu trong named volume `pgdata`. Lệnh `docker compose down` giữ nguyên volume; `docker compose down -v` xóa cả dữ liệu database và Grafana. Không đưa database dump hoặc dữ liệu chi tiêu thật lên GitHub. Thư mục `backups/` đã được loại khỏi Git.
@@ -85,7 +121,7 @@ Chạy trong Bash, Git Bash hoặc WSL để tạo bản sao lưu SQL:
 
 ```sh
 mkdir -p backups
-docker compose exec -T postgres pg_dump -U expense_user -d expense_db > backups/expense_db.sql
+docker compose exec -T postgres pg_dump -U admin -d expense_db > backups/expense_db.sql
 ```
 
 ### Khôi phục PostgreSQL
@@ -94,8 +130,8 @@ Lệnh dưới đây thay thế bảng chi tiêu hiện tại bằng dữ liệu
 
 ```sh
 docker compose stop backend
-docker compose exec -T postgres psql -U expense_user -d expense_db -c 'DROP TABLE IF EXISTS public.expenses CASCADE'
-docker compose exec -T postgres psql -U expense_user -d expense_db < backups/expense_db.sql
+docker compose exec -T postgres psql -U admin -d expense_db -c 'DROP TABLE IF EXISTS public.expenses CASCADE'
+docker compose exec -T postgres psql -U admin -d expense_db < backups/expense_db.sql
 docker compose start backend
 ```
 
