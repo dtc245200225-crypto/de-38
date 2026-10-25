@@ -2,33 +2,23 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Quản lý Chi tiêu - IP: 192.168.105.128</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f6f9; }
-    .container { max-width: 750px; margin: auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    h2 { text-align: center; color: #333; margin-bottom: 5px; }
-    .ip-badge { text-align: center; font-weight: bold; color: #007bff; background: #e9f2ff; padding: 5px 10px; border-radius: 4px; margin-bottom: 20px; }
-    form { display: flex; gap: 10px; margin-bottom: 20px; }
-    input, select, button { padding: 10px; font-size: 14px; }
-    input[type="text"] { flex: 2; }
-    input[type="number"] { flex: 1; }
-    button { background: #28a745; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; }
-    button:hover { background: #218838; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background: #007bff; color: white; }
-    .btn-delete { background: #dc3545; padding: 5px 10px; font-size: 12px; color: white; border: none; border-radius: 3px; cursor: pointer; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hệ thống Quản lý Chi tiêu</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
 </head>
 <body>
-  <div class="container">
-    <h2>Hệ thống Quản lý Chi tiêu</h2>
-    <div class="ip-badge">Server IP Address: 192.168.105.128</div>
+  <main class="container">
+    <h1>Hệ thống Quản lý Chi tiêu</h1>
+    <p class="ip-badge">Expense Tracker - Docker Compose</p>
 
     <form id="expenseForm">
-      <input type="text" id="title" placeholder="Tên khoản chi (VD: Mua sách)" required>
-      <input type="number" id="amount" placeholder="Số tiền (VNĐ)" required>
-      <select id="category">
+      <label class="visually-hidden" for="title">Tên khoản chi</label>
+      <input type="text" id="title" name="title" placeholder="Tên khoản chi (VD: Mua sách)" maxlength="100" required>
+      <label class="visually-hidden" for="amount">Số tiền</label>
+      <input type="number" id="amount" name="amount" placeholder="Số tiền (VNĐ)" min="1" step="0.01" required>
+      <label class="visually-hidden" for="category">Danh mục</label>
+      <select id="category" name="category">
         <option value="Ăn uống">Ăn uống</option>
         <option value="Giải trí">Giải trí</option>
         <option value="Hóa đơn">Hóa đơn</option>
@@ -37,71 +27,22 @@
       <button type="submit">Thêm chi tiêu</button>
     </form>
 
-    <h3>Danh sách chi tiêu</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Thời gian</th>
-          <th>Danh mục</th>
-          <th>Nội dung</th>
-          <th>Số tiền (VNĐ)</th>
-          <th>Hành động</th>
-        </tr>
-      </thead>
-      <tbody id="expenseList"></tbody>
-    </table>
-  </div>
-
-  <script>
-    const API_URL = '/api/expenses';
-
-    async function loadExpenses() {
-      try {
-        const res = await fetch(API_URL);
-        const data = await res.json();
-        const tbody = document.getElementById('expenseList');
-        tbody.innerHTML = '';
-        data.forEach(item => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${new Date(item.created_at).toLocaleString('vi-VN')}</td>
-            <td>${item.category}</td>
-            <td>${item.title}</td>
-            <td>${Number(item.amount).toLocaleString('vi-VN')}</td>
-            <td><button class="btn-delete" onclick="deleteExpense(${item.id})">Xóa</button></td>
-          `;
-          tbody.appendChild(row);
-        });
-      } catch (err) {
-        console.error("Lỗi tải dữ liệu:", err);
-      }
-    }
-
-    document.getElementById('expenseForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const title = document.getElementById('title').value;
-      const amount = document.getElementById('amount').value;
-      const category = document.getElementById('category').value;
-
-      await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, amount, category })
-      });
-
-      document.getElementById('title').value = '';
-      document.getElementById('amount').value = '';
-      loadExpenses();
-    });
-
-    async function deleteExpense(id) {
-      if (confirm('Xác nhận xóa khoản chi tiêu này?')) {
-        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-        loadExpenses();
-      }
-    }
-
-    loadExpenses();
-  </script>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <h2>Danh sách chi tiêu</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Thời gian</th>
+            <th scope="col">Danh mục</th>
+            <th scope="col">Nội dung</th>
+            <th scope="col">Số tiền (VNĐ)</th>
+            <th scope="col">Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="expenseList"></tbody>
+      </table>
+    </div>
+  </main>
 </body>
 </html>
