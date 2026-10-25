@@ -133,14 +133,15 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - monitoring_net
-
   promtail:
     image: grafana/promtail:2.8.2
     container_name: promtail
+    environment:
+      - DOCKER_API_VERSION=1.44
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/log/nginx:/var/log/nginx:ro
-    command: -config.file=/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
     networks:
       - monitoring_net
